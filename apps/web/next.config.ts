@@ -222,9 +222,6 @@ const nextConfig = (phase: string): NextConfig => {
   }
 
   return {
-    typescript: {
-      ignoreBuildErrors: true,
-    },
     output: process.env.BUILD_STANDALONE === "true" ? "standalone" : undefined,
     serverExternalPackages: [
       "deasync",
