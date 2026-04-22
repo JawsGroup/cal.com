@@ -105,6 +105,7 @@ export default function Login({
   csrfToken,
   isGoogleLoginEnabled,
   isOutlookLoginEnabled,
+  isPasswordLoginEnabled = true,
   totpEmail,
 }: PageProps) {
   const searchParams = useCompatSearchParams();
@@ -233,18 +234,20 @@ export default function Login({
                 </div>
 
                 {/* Divider */}
-                <div className="my-6 flex items-center gap-4">
-                  <Separator className="flex-1" />
-                  <span className="text-sm text-zinc-400">{t("or").toLowerCase()}</span>
-                  <Separator className="flex-1" />
-                </div>
+                {isPasswordLoginEnabled && (
+                  <div className="my-6 flex items-center gap-4">
+                    <Separator className="flex-1" />
+                    <span className="text-sm text-zinc-400">{t("or").toLowerCase()}</span>
+                    <Separator className="flex-1" />
+                  </div>
+                )}
               </>
             )}
 
             <form onSubmit={methods.handleSubmit(onSubmit)} noValidate data-testid="login-form">
               <input defaultValue={csrfToken || undefined} type="hidden" hidden {...register("csrfToken")} />
 
-              {!twoFactorRequired && (
+              {!twoFactorRequired && isPasswordLoginEnabled && (
                 <div className="space-y-6">
                   {/* Email Field */}
                   <Field>
@@ -309,13 +312,15 @@ export default function Login({
               {errorMessage && <Alert severity="error" title={errorMessage} className="mt-4" />}
 
               {/* Submit Button */}
-              <Button
-                type="submit"
-                variant="outline"
-                className="mt-8 w-full"
-                disabled={formState.isSubmitting}>
-                {twoFactorRequired ? t("submit") : t("continue")}
-              </Button>
+              {(isPasswordLoginEnabled || twoFactorRequired) && (
+                <Button
+                  type="submit"
+                  variant="outline"
+                  className="mt-8 w-full"
+                  disabled={formState.isSubmitting}>
+                  {twoFactorRequired ? t("submit") : t("continue")}
+                </Button>
+              )}
             </form>
 
             {/* Two Factor Footer */}
