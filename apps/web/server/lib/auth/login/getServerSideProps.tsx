@@ -95,6 +95,7 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
       isSAMLLoginEnabled,
       samlTenantID,
       samlProductID,
+      isPasswordLoginEnabled: process.env.ALLOW_PASSWORD_LOGIN !== "false",
       totpEmail,
     },
   };

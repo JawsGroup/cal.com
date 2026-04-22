@@ -111,6 +111,10 @@ const GOOGLE_LOGIN_ENABLED = process.env.GOOGLE_LOGIN_ENABLED === "true";
 const IS_GOOGLE_LOGIN_ENABLED = !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_LOGIN_ENABLED);
 const ORGANIZATIONS_AUTOLINK =
   process.env.ORGANIZATIONS_AUTOLINK === "1" || process.env.ORGANIZATIONS_AUTOLINK === "true";
+const ALLOW_PASSWORD_LOGIN = process.env.ALLOW_PASSWORD_LOGIN !== "false";
+const ALLOWED_EMAIL_DOMAINS = process.env.ALLOWED_EMAIL_DOMAINS
+  ? process.env.ALLOWED_EMAIL_DOMAINS.split(",").map((d) => d.trim())
+  : [];
 
 const usernameSlug = (username: string) => `${slugify(username)}-${randomString(6).toLowerCase()}`;
 const getDomainFromEmail = (email: string): string => email.split("@")[1];
@@ -325,7 +329,9 @@ export const CalComCredentialsProvider = CredentialsProvider({
   authorize: authorizeCredentials,
 });
 
-const providers: Provider[] = [CalComCredentialsProvider, ImpersonationProvider];
+const providers: Provider[] = ALLOW_PASSWORD_LOGIN
+  ? [CalComCredentialsProvider, ImpersonationProvider]
+  : [ImpersonationProvider];
 type SamlIdpUser = {
   id: number;
   userId: number;
@@ -543,14 +549,16 @@ if (OUTLOOK_LOGIN_ENABLED && OUTLOOK_CLIENT_ID && OUTLOOK_CLIENT_SECRET) {
   );
 }
 
-providers.push(
-  EmailProvider({
-    type: "email",
-    maxAge: 10 * 60 * 60, // Magic links are valid for 10 min only
-    // Here we setup the sendVerificationRequest that calls the email template with the identifier (email) and token to verify.
-    sendVerificationRequest: async (props) => (await import("./sendVerificationRequest")).default(props),
-  })
-);
+if (ALLOW_PASSWORD_LOGIN) {
+  providers.push(
+    EmailProvider({
+      type: "email",
+      maxAge: 10 * 60 * 60, // Magic links are valid for 10 min only
+      // Here we setup the sendVerificationRequest that calls the email template with the identifier (email) and token to verify.
+      sendVerificationRequest: async (props) => (await import("./sendVerificationRequest")).default(props),
+    })
+  );
+}
 
 function isNumber(n: string) {
   return !isNaN(parseFloat(n)) && !isNaN(+n);
@@ -989,6 +997,13 @@ export const getOptions = ({
       const { user, account, profile } = params;
 
       log.debug("callbacks:signin", safeStringify(params));
+
+      if (ALLOWED_EMAIL_DOMAINS.length > 0 && user.email) {
+        const domain = user.email.split("@")[1];
+        if (!ALLOWED_EMAIL_DOMAINS.includes(domain)) {
+          return "/auth/error?error=domain-not-allowed";
+        }
+      }
 
       // Extract samlTenant from user (credentials/saml-idp) or profile (oauth/saml)
       const getSamlTenant = (): string | undefined => {
