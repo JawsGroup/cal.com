@@ -5,9 +5,9 @@ import { useState } from "react";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { CreationSource, MembershipRole } from "@calcom/prisma/enums";
 import { trpc } from "@calcom/trpc/react";
-import { Alert } from "@calcom/ui/components/alert";
 import { Avatar } from "@calcom/ui/components/avatar";
 import { Badge } from "@calcom/ui/components/badge";
+import { Select } from "@calcom/ui/components/form";
 import { Icon } from "@calcom/ui/components/icon";
 import { showToast } from "@calcom/ui/components/toast";
 import { Button } from "@coss/ui/components/button";
@@ -22,7 +22,7 @@ const ROLE_OPTIONS = [
   { value: MembershipRole.MEMBER, label: "Member" },
   { value: MembershipRole.ADMIN, label: "Admin" },
   { value: MembershipRole.OWNER, label: "Owner" },
-] as const;
+];
 
 export default function TeamMembersPage({ teamId, isOwner }: TeamMembersPageProps) {
   const { t, i18n } = useLocale();
@@ -112,16 +112,14 @@ export default function TeamMembersPage({ teamId, isOwner }: TeamMembersPageProp
                 onKeyDown={(e) => e.key === "Enter" && handleInvite()}
               />
             </div>
-            <select
-              className="border-default bg-default text-emphasis rounded-md border px-3 py-2 text-sm"
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as MembershipRole)}>
-              {ROLE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            <div className="w-36">
+              <Select
+                options={ROLE_OPTIONS}
+                value={ROLE_OPTIONS.find((o) => o.value === inviteRole)}
+                onChange={(selected) => selected && setInviteRole(selected.value as MembershipRole)}
+                isSearchable={false}
+              />
+            </div>
             <Button onClick={handleInvite} disabled={inviteMutation.isPending || !inviteEmail.trim()}>
               {inviteMutation.isPending ? "..." : t("invite")}
             </Button>
@@ -166,16 +164,16 @@ export default function TeamMembersPage({ teamId, isOwner }: TeamMembersPageProp
 
                 <div className="flex items-center gap-2">
                   {isOwner ? (
-                    <select
-                      className="border-default bg-default text-emphasis rounded-md border px-2 py-1 text-xs"
-                      value={member.role}
-                      onChange={(e) => handleRoleChange(member.id, e.target.value as MembershipRole)}>
-                      {ROLE_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="w-32">
+                      <Select
+                        options={ROLE_OPTIONS}
+                        value={ROLE_OPTIONS.find((o) => o.value === member.role)}
+                        onChange={(selected) =>
+                          selected && handleRoleChange(member.id, selected.value as MembershipRole)
+                        }
+                        isSearchable={false}
+                      />
+                    </div>
                   ) : (
                     <Badge variant="gray">{member.role}</Badge>
                   )}
