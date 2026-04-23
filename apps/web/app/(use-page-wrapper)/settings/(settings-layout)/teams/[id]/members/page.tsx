@@ -1,16 +1,11 @@
-import { PrismaAttributeRepository } from "@calcom/features/attributes/repositories/PrismaAttributeRepository";
 import { getServerSession } from "@calcom/features/auth/lib/getServerSession";
-import { getTeamMemberPermissions } from "@calcom/features/pbac/lib/team-member-permissions";
-import { RoleManagementFactory } from "@calcom/features/pbac/services/role-management.factory";
 import SettingsHeader from "@calcom/features/settings/appDir/SettingsHeader";
-import { prisma } from "@calcom/prisma";
+import { MembershipRole } from "@calcom/prisma/enums";
 import { viewerTeamsRouter } from "@calcom/trpc/server/routers/viewer/teams/_router";
-import { WideUpgradeBannerForMembers } from "@calcom/web/modules/billing/upgrade-banners/WideUpgradeBannerForMembers";
-import { TeamMembersView } from "@calcom/web/modules/ee/teams/views/team-members-view";
+import TeamMembersPage from "@calcom/web/modules/teams/views/TeamMembersPage";
 import { buildLegacyRequest } from "@lib/buildLegacyCtx";
 import { createRouterCaller } from "app/_trpc/context";
 import { _generateMetadata, getTranslate } from "app/_utils";
-import { unstable_cache } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -22,36 +17,6 @@ export const generateMetadata = async ({ params }: { params: Promise<{ id: strin
     undefined,
     `/settings/teams/${(await params).id}/members`
   );
-
-const getCachedTeamRoles = unstable_cache(
-  async (teamId: number, organizationId?: number) => {
-    if (!organizationId) return []; // Fallback to traditional roles
-    try {
-      const roleManager = await RoleManagementFactory.getInstance().createRoleManager(organizationId);
-      return await roleManager.getTeamRoles(teamId);
-    } catch {
-      // PBAC not enabled or error occurred, return empty array
-      return [];
-    }
-  },
-  undefined,
-  { revalidate: 3600, tags: ["pbac.team.roles.list"] } // Cache for 1 hour
-);
-
-const getCachedTeamAttributes = unstable_cache(
-  async (organizationId?: number) => {
-    if (!organizationId) return [];
-    const attributeRepo = new PrismaAttributeRepository(prisma);
-
-    try {
-      return await attributeRepo.findAllByOrgIdWithOptions({ orgId: organizationId });
-    } catch {
-      return [];
-    }
-  },
-  undefined,
-  { revalidate: 3600, tags: ["viewer.attributes.list"] } // Cache for 1 hour
-);
 
 const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
   const t = await getTranslate();
@@ -71,44 +36,11 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
     throw new Error("Team not found");
   }
 
-  // Get organization ID (either the team's parent or the team itself if it's an org)
-  const organizationId = team.parentId || teamId;
-
-  // Load PBAC roles and attributes if available
-  const [roles, attributes, memberPermissions] = await Promise.all([
-    getCachedTeamRoles(teamId, organizationId),
-    getCachedTeamAttributes(organizationId),
-    getTeamMemberPermissions({
-      userId: session.user.id,
-      team,
-    }),
-  ]);
-
-  const facetedTeamValues = {
-    roles,
-    teams: [team],
-    attributes: attributes.map((attribute) => ({
-      id: attribute.id,
-      name: attribute.name,
-      options: Array.from(new Set(attribute.options.map((option) => option.value))).map((value) => ({
-        value,
-      })),
-    })),
-  };
+  const isOwner = team.membership.role === MembershipRole.OWNER;
 
   return (
     <SettingsHeader title={t("team_members")} description={t("members_team_description")}>
-      {!team.parentId && (
-        <div className="mb-4">
-          <WideUpgradeBannerForMembers />
-        </div>
-      )}
-      <TeamMembersView
-        team={team}
-        facetedTeamValues={facetedTeamValues}
-        attributes={attributes}
-        permissions={memberPermissions}
-      />
+      <TeamMembersPage teamId={teamId} isOwner={isOwner} />
     </SettingsHeader>
   );
 };
